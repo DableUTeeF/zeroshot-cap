@@ -31,7 +31,7 @@ class Model:
 
     @torch.no_grad()
     def encode(self, text):
-        tokens = self.score_tokenizer(text, return_tensors='pt').to('cuda')
+        tokens = self.score_tokenizer(text, return_tensors='pt', padding=True, truncation=True).to('cuda')
         embs = self.transformer(**tokens)[0]
         att = tokens['attention_mask']
         embs = (embs * att.unsqueeze(2)).sum(dim=1) / att.sum(dim=1)[:, None]
@@ -58,9 +58,9 @@ def search(model,
            gt='image of a sleeping girl amidst elegant swirling water',
            depth=2,
            width=3,
+           samples=100,
            scores=None,
            ):
-    print('a')
     if depth < 1:
         return scores
     encoded_prompt = model.encode(prompt.replace('<mask>', ''))
@@ -78,11 +78,20 @@ def search(model,
         else:
             chosen_idx = torch.where(mask)[0].cpu().numpy()
             idx = np.random.choice(chosen_idx)
-        x = x[0, idx, :width]
-        for w in range(width):
+        x = x[0, idx, :samples]
+        temp_scores = []
+        temp_prompts = []
+        for s in range(samples):
             temp_input_ids = prompts['input_ids'][0]
-            temp_input_ids[idx] = x[w]
+            temp_input_ids[idx] = x[s]
             temp_prompt = model.detokenize(temp_input_ids)
+            feat = model.encode(temp_prompt)
+            temp_scores.append(util.dot_score(feat, encoded_gt)[0][0].cpu().numpy().tolist())
+            temp_prompts.append(temp_prompt)
+        temp_scores = torch.tensor(temp_scores)
+        indice = temp_scores.argsort(-1, True)
+        for w in range(width):
+            temp_prompt = temp_prompts[indice[w]]
             if temp_prompt not in scores:
                 encoded_prompt = model.encode(temp_prompt)
                 scores[temp_prompt] = util.dot_score(encoded_prompt, encoded_gt)[0][0].cpu().numpy().tolist()
@@ -94,3 +103,4 @@ if __name__ == '__main__':
     scoring_model = Model()
     json.dump(search(scoring_model),
               open('out/c.json', 'w'))
+    np.argsort
