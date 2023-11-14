@@ -56,8 +56,8 @@ class Model:
 def search(model,
            prompt='รูปของ<mask><mask><mask><mask><mask><mask><mask><mask>',
            gt='image of a sleeping girl amidst elegant swirling water',
-           depth=2,
-           width=3,
+           depth=5,
+           width=10,
            samples=100,
            scores=None,
            ):
@@ -85,17 +85,17 @@ def search(model,
             temp_input_ids = prompts['input_ids'][0]
             temp_input_ids[idx] = x[s]
             temp_prompt = model.detokenize(temp_input_ids)
-            feat = model.encode(temp_prompt)
-            temp_scores.append(util.dot_score(feat, encoded_gt)[0][0].cpu().numpy().tolist())
-            temp_prompts.append(temp_prompt)
+            if temp_prompt not in scores:
+                feat = model.encode(temp_prompt)
+                temp_scores.append(util.dot_score(feat, encoded_gt)[0][0].cpu().numpy().tolist())
+                temp_prompts.append(temp_prompt)
         temp_scores = torch.tensor(temp_scores)
         indice = temp_scores.argsort(-1, True)
         for w in range(width):
             temp_prompt = temp_prompts[indice[w]]
-            if temp_prompt not in scores:
-                encoded_prompt = model.encode(temp_prompt)
-                scores[temp_prompt] = util.dot_score(encoded_prompt, encoded_gt)[0][0].cpu().numpy().tolist()
-            scores = search(model, temp_prompt+'<mask>'*5, gt=gt, scores=scores, width=width, depth=depth-1)
+            encoded_prompt = model.encode(temp_prompt)
+            scores[temp_prompt] = util.dot_score(encoded_prompt, encoded_gt)[0][0].cpu().numpy().tolist()
+            scores = search(model, temp_prompt+'<mask>'*5, gt=gt, scores=scores, width=width, depth=depth-1, samples=samples)
     return scores
 
 
