@@ -2,6 +2,7 @@ import evaluate
 import json
 import pandas as pd
 import nltk
+from transformers import AutoTokenizer
 
 
 def postprocess_text(preds, labels):
@@ -26,30 +27,33 @@ def compute_metrics(eval_preds):
 
 
 if __name__ == '__main__':
+    tokenizer = AutoTokenizer.from_pretrained("facebook/nllb-200-distilled-600M", src_lang="eng_Latn")
     rouge = evaluate.load("rouge")
     bleu = evaluate.load("bleu")
     sacrebleu = evaluate.load("sacrebleu")
-    origins = json.load(open('/home/palm/data/coco/annotations/annotations/caption_human_thai_val2017.json'))
+    origins = json.load(open('/media/palm/data/coco/annotations/caption_human_thai_val2017.json'))
     df = pd.read_csv('outputs.csv')
     gt = {}
     for ann in origins['annotations']:
         if int(ann['image_id']) not in gt:
             gt[int(ann['image_id'])] = []
-        gt[int(ann['image_id'])].append(ann['caption_thai'])
+        text = ' '.join([tokenizer.decode(x) for x in tokenizer(ann['caption_thai'])['input_ids'][1:-1]])
+        gt[int(ann['image_id'])].append(text)
     pd = {}
     for idx, row in df.iterrows():
         key = int(row[0][:-4])
         if key in gt:
-            pd[key] = row[1]
+            text = ' '.join([tokenizer.decode(x) for x in tokenizer(row[1])['input_ids'][1:-1]])
+            pd[key] = text
     labels = []
     preds = []
     for key in gt:
-        if len(gt[key]) < 4:
+        if len(gt[key]) < 2:
             continue
-        elif len(gt[key]) > 4:
-            gt[key] = gt[key][:4]
+        elif len(gt[key]) > 2:
+            gt[key] = gt[key][:2]
         labels.append(gt[key])
         preds.append(pd[key])
-    compute_metrics((preds, labels))
     results = sacrebleu.compute(predictions=preds,
                                 references=labels)
+    print(results)

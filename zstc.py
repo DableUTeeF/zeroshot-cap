@@ -7,6 +7,7 @@ from transformers import VisionEncoderDecoderModel, AutoModelForSeq2SeqLM, CLIPM
 from PIL import Image
 import json
 import pandas as pd
+from transformers import M2M100ForConditionalGeneration, M2M100Tokenizer
 
 
 class ZeroShotThaiCapgen(nn.Module):
@@ -17,8 +18,11 @@ class ZeroShotThaiCapgen(nn.Module):
         self.ic_tokenizer = GPT2TokenizerFast.from_pretrained("nlpconnect/vit-gpt2-image-captioning")
         self.ic_feature_extractor = ViTFeatureExtractor.from_pretrained("nlpconnect/vit-gpt2-image-captioning")
 
-        self.tr_model = AutoModelForSeq2SeqLM.from_pretrained("facebook/nllb-200-distilled-600M")
-        self.tr_tokenizer = AutoTokenizer.from_pretrained("facebook/nllb-200-distilled-600M", src_lang="eng_Latn")
+        # self.tr_model = AutoModelForSeq2SeqLM.from_pretrained("facebook/nllb-200-distilled-600M")
+        # self.tr_tokenizer = AutoTokenizer.from_pretrained("facebook/nllb-200-distilled-600M", src_lang="eng_Latn")
+        self.tr_model = M2M100ForConditionalGeneration.from_pretrained("facebook/m2m100_418M")
+        self.tr_tokenizer = M2M100Tokenizer.from_pretrained("facebook/m2m100_418M")
+        self.tokenizer.src_lang = "en"
 
         self.clip_model = CLIPModel.from_pretrained("openai/clip-vit-base-patch32")
         self.clip_processor = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32")
@@ -81,7 +85,11 @@ class ZeroShotThaiCapgen(nn.Module):
             gen_kwargs,
     ):
         inputs = self.tr_tokenizer(eng_caption, return_tensors="pt").to('cuda')
-        translated_tokens = self.tr_model.generate(**inputs, forced_bos_token_id=self.tr_tokenizer.lang_code_to_id["tha_Thai"], **gen_kwargs)
+        translated_tokens = self.tr_model.generate(
+            **inputs,
+            forced_bos_token_id=self.tr_tokenizer.get_lang_id("th"),
+            **gen_kwargs
+        )
         tha_caption = self.tr_tokenizer.batch_decode(translated_tokens, skip_special_tokens=True)
 
         return tha_caption
