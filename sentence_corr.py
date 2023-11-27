@@ -62,11 +62,11 @@ if __name__ == '__main__':
     output_dir = 'checkpoints/'
     rouge = evaluate.load('rouge')
 
-    model = AutoModelForCausalLM.from_pretrained('clicknext/phayathaibert')
-    tokenizer = AutoTokenizer.from_pretrained('clicknext/phayathaibert')
+    model = AutoModelForCausalLM.from_pretrained('clicknext/phayathaibert', is_decoder=True)
+    tokenizer = AutoTokenizer.from_pretrained('clicknext/phayathaibert', padding_side='left')
 
-    train_set = MTLDataset('data/train.csv')
-    valid_set = MTLDataset('data/val.csv')
+    train_set = MTLDataset('data/train2.csv')
+    valid_set = MTLDataset('data/val2.csv')
 
     training_args = Seq2SeqTrainingArguments(
         predict_with_generate=True,
@@ -81,8 +81,9 @@ if __name__ == '__main__':
         logging_dir='logs',
         dataloader_num_workers=0,
         logging_strategy='steps',
-        logging_steps=100,
+        logging_steps=10,
         # disable_tqdm=True,
+        generation_max_length=124,
         report_to=['tensorboard']
     )
     trainer = Seq2SeqTrainer(
