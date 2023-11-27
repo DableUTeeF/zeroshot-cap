@@ -22,7 +22,7 @@ class ZeroShotThaiCapgen(nn.Module):
         # self.tr_tokenizer = AutoTokenizer.from_pretrained("facebook/nllb-200-distilled-600M", src_lang="eng_Latn")
         self.tr_model = M2M100ForConditionalGeneration.from_pretrained("facebook/m2m100_418M")
         self.tr_tokenizer = M2M100Tokenizer.from_pretrained("facebook/m2m100_418M")
-        self.tokenizer.src_lang = "en"
+        self.tr_tokenizer.src_lang = "en"
 
         self.clip_model = CLIPModel.from_pretrained("openai/clip-vit-base-patch32")
         self.clip_processor = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32")
@@ -159,18 +159,18 @@ if __name__ == '__main__':
     capgen = ZeroShotThaiCapgen().eval().cuda()
     print('cuda')
     src = '/home/palm/data/coco/images'
-    outputs = json.load(open('outputs.json'))
+    # outputs = json.load(open('outputs.json'))
     # df = pd.read_csv('outputs.csv', header=None)
     # finished = list(outputs.keys()) + list(df[0])
     print('starting')
-    with open('outputs.csv', 'a') as wr:
-        for folder in ['val2017', 'train2017']:
+    with open('outputs2.csv', 'a') as wr:
+        for folder in ['val2017']:
             print(folder)
             for file in os.listdir(os.path.join(src, folder)):
-                if file in outputs:
-                    continue
+                # if file in outputs:
+                #     continue
                 image = Image.open(os.path.join(src, folder, file)).convert('RGB')
                 outputs[file] = capgen(image)
                 wr.write(f'{file},"{outputs[file][0]}","{outputs[file][1]}"\n')
-    json.dump(outputs,
-              open('outputs.json', 'w'))
+    # json.dump(outputs,
+    #           open('outputs2.json', 'w'))
