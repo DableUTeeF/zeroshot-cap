@@ -69,7 +69,7 @@ class MTLDataset(Dataset):
 
     def __getitem__(self, idx):
         data = self.df.iloc[idx]
-        return data[0], data[2]
+        return data[2], data[0]
 
 
 if __name__ == '__main__':
