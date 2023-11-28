@@ -46,8 +46,16 @@ def compute_metrics(eval_preds):
     preds, labels = eval_preds
     if isinstance(preds, tuple):
         preds = preds[0]
-    decoded_preds = tokenizer.batch_decode(preds, skip_special_tokens=True)
-    decoded_labels = tokenizer.batch_decode(labels, skip_special_tokens=True)
+    # decoded_preds = tokenizer.batch_decode(preds, skip_special_tokens=True)
+    # decoded_labels = tokenizer.batch_decode(labels, skip_special_tokens=True)
+    try:
+
+        decoded_preds = [' '.join([tokenizer.decode(p, skip_special_tokens=True) for p in pred if p > 0]) for pred in preds]
+    except OverflowError as e:
+        import torch
+        torch.save(preds, 'preds.pth')
+        raise OverflowError(e)
+    decoded_labels = [' '.join([tokenizer.decode(l, skip_special_tokens=True) for l in label if l > 0]) for label in labels]
     # Some simple post-processing
     decoded_preds, decoded_labels = postprocess_text(decoded_preds,
                                                      decoded_labels)
@@ -58,14 +66,14 @@ def compute_metrics(eval_preds):
 
 
 if __name__ == '__main__':
-    bs = 2
+    bs = 8
     output_dir = 'checkpoints/'
     rouge = evaluate.load('rouge')
 
-    model = AutoModelForCausalLM.from_pretrained('clicknext/phayathaibert', is_decoder=True)
-    tokenizer = AutoTokenizer.from_pretrained('clicknext/phayathaibert', padding_side='left')
+    model = AutoModelForCausalLM.from_pretrained('/home/palm/PycharmProjects/capocr/workdir/tinygpt_distilled_256_8_0.5_32_8_distil_prerained_mse/train/checkpoint-905000')
+    tokenizer = AutoTokenizer.from_pretrained('/home/palm/PycharmProjects/capocr/workdir/tinygpt_distilled_256_8_0.5_32_8_distil_prerained_mse/train/checkpoint-905000')
 
-    train_set = MTLDataset('data/train2.csv')
+    train_set = MTLDataset('data/train.csv')
     valid_set = MTLDataset('data/val2.csv')
 
     training_args = Seq2SeqTrainingArguments(
@@ -79,7 +87,7 @@ if __name__ == '__main__':
         num_train_epochs=12,
         output_dir=os.path.join(output_dir),
         logging_dir='logs',
-        dataloader_num_workers=0,
+        dataloader_num_workers=1,
         logging_strategy='steps',
         logging_steps=10,
         # disable_tqdm=True,
@@ -95,4 +103,4 @@ if __name__ == '__main__':
         eval_dataset=valid_set,
         data_collator=collate_fn,
     )
-    trainer.train()
+    trainer.train(resume_from_checkpoint=True)
