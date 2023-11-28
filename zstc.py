@@ -161,21 +161,23 @@ if __name__ == '__main__':
     # finished = list(outputs.keys()) + list(df[0])
     print('starting')
     outputs = {}
+    df = pd.read_csv('outputs2.csv', header=None)
     for folder in ['val2017']:
         print(folder)
-        for file in os.listdir(os.path.join(src, folder)):
+        for idx, row in df.iterrows():
             # if file in outputs:
             #     continue
+            file = row[0]
             image = Image.open(os.path.join(src, folder, file)).convert('RGB')
-            outputs[file] = capgen(image, return_eng=True)
-            df = pd.DataFrame({
-                'file': [file],
-                '0': [outputs[file][0]],
-                '1': [outputs[file][1]],
-                '2': [outputs[file][2]],
-                '3': [outputs[file][3]],
-                '4': [outputs[file][4]],
-            })
-            df.to_csv(f'outputs2.csv', mode='a', header=False, index=False)
-    # json.dump(outputs,
-    #           open('outputs2.json', 'w'))
+            outputs[file] = capgen(image, eng_captions=row.values[1:].tolist())
+            # df = pd.DataFrame({
+            #     'file': [file],
+            #     '0': [outputs[file][0]],
+            #     '1': [outputs[file][1]],
+            #     '2': [outputs[file][2]],
+            #     '3': [outputs[file][3]],
+            #     '4': [outputs[file][4]],
+            # })
+            # df.to_csv(f'outputs2.csv', mode='a', header=False, index=False)
+    json.dump(outputs,
+              open('outputs2.json', 'w'))
