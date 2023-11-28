@@ -3,26 +3,23 @@ import os
 import torch
 import torch.nn as nn
 
-from transformers import VisionEncoderDecoderModel, AutoModelForSeq2SeqLM, CLIPModel, AutoTokenizer, CLIPProcessor, GPT2TokenizerFast, ViTFeatureExtractor, GPT2LMHeadModel
+from transformers import BlipForConditionalGeneration, AutoModelForSeq2SeqLM, CLIPModel, AutoTokenizer, CLIPProcessor, AutoProcessor, GPT2TokenizerFast, GPT2LMHeadModel
 from PIL import Image
 import json
 import pandas as pd
-from transformers import M2M100ForConditionalGeneration, M2M100Tokenizer
 
 
 class ZeroShotThaiCapgen(nn.Module):
 
     def __init__(self):
         super().__init__()
-        self.ic_model = VisionEncoderDecoderModel.from_pretrained("nlpconnect/vit-gpt2-image-captioning")
-        self.ic_tokenizer = GPT2TokenizerFast.from_pretrained("nlpconnect/vit-gpt2-image-captioning")
-        self.ic_feature_extractor = ViTFeatureExtractor.from_pretrained("nlpconnect/vit-gpt2-image-captioning")
+        self.ic_model = BlipForConditionalGeneration.from_pretrained("Salesforce/blip-image-captioning-base")
+        self.ic_processor = AutoProcessor.from_pretrained("Salesforce/blip-image-captioning-base")
 
         # self.tr_model = AutoModelForSeq2SeqLM.from_pretrained("facebook/nllb-200-distilled-600M")
         # self.tr_tokenizer = AutoTokenizer.from_pretrained("facebook/nllb-200-distilled-600M", src_lang="eng_Latn")
-        self.tr_model = M2M100ForConditionalGeneration.from_pretrained("facebook/m2m100_418M")
-        self.tr_tokenizer = M2M100Tokenizer.from_pretrained("facebook/m2m100_418M")
-        self.tr_tokenizer.src_lang = "en"
+        self.tr_model = AutoModelForSeq2SeqLM.from_pretrained("facebook/nllb-200-distilled-600M")
+        self.tr_tokenizer = AutoTokenizer.from_pretrained("facebook/nllb-200-distilled-600M", src_lang="eng_Latn")
 
         self.clip_model = CLIPModel.from_pretrained("openai/clip-vit-base-patch32")
         self.clip_processor = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32")
@@ -43,11 +40,11 @@ class ZeroShotThaiCapgen(nn.Module):
             gen_kwargs,
     ):
 
-        pixel_values = self.ic_feature_extractor(images=[pil_image], return_tensors="pt").pixel_values.to('cuda')
+        pixel_values = self.ic_processor(images=[pil_image], return_tensors="pt").pixel_values.to('cuda')
 
         output_ids = self.ic_model.generate(pixel_values, **gen_kwargs)
 
-        eng_caption = self.ic_tokenizer.batch_decode(output_ids, skip_special_tokens=True)
+        eng_caption = self.ic_processor.batch_decode(output_ids, skip_special_tokens=True)
 
         return eng_caption
 
@@ -85,11 +82,7 @@ class ZeroShotThaiCapgen(nn.Module):
             gen_kwargs,
     ):
         inputs = self.tr_tokenizer(eng_caption, return_tensors="pt").to('cuda')
-        translated_tokens = self.tr_model.generate(
-            **inputs,
-            forced_bos_token_id=self.tr_tokenizer.get_lang_id("th"),
-            **gen_kwargs
-        )
+        translated_tokens = self.tr_model.generate(**inputs, forced_bos_token_id=self.tr_tokenizer.lang_code_to_id["tha_Thai"],  **gen_kwargs)
         tha_caption = self.tr_tokenizer.batch_decode(translated_tokens, skip_special_tokens=True)
 
         return tha_caption
@@ -101,6 +94,8 @@ class ZeroShotThaiCapgen(nn.Module):
             num_beams=5,
             max_length=30,
             num_return_sequences=5,
+            return_eng=False,
+            eng_captions=None,
     ):
 
         gen_kwargs = {
@@ -108,9 +103,11 @@ class ZeroShotThaiCapgen(nn.Module):
             "max_length": max_length,
             "num_return_sequences": num_return_sequences
         }
-
-        eng_captions = self.img2eng(pil_image, gen_kwargs)
+        if eng_captions is None:
+            eng_captions = self.img2eng(pil_image, gen_kwargs)
         # print(eng_captions)
+        if return_eng:
+            return eng_captions
 
         selected_eng_caption = self.select_caption(pil_image, eng_captions, use_ppl=False)
 
@@ -158,19 +155,27 @@ class ZeroShotThaiCapgen(nn.Module):
 if __name__ == '__main__':
     capgen = ZeroShotThaiCapgen().eval().cuda()
     print('cuda')
-    src = '/home/palm/data/coco/images'
+    src = '/media/palm/data/coco/images'
     # outputs = json.load(open('outputs.json'))
     # df = pd.read_csv('outputs.csv', header=None)
     # finished = list(outputs.keys()) + list(df[0])
     print('starting')
-    with open('outputs2.csv', 'a') as wr:
-        for folder in ['val2017']:
-            print(folder)
-            for file in os.listdir(os.path.join(src, folder)):
-                # if file in outputs:
-                #     continue
-                image = Image.open(os.path.join(src, folder, file)).convert('RGB')
-                outputs[file] = capgen(image)
-                wr.write(f'{file},"{outputs[file][0]}","{outputs[file][1]}"\n')
+    outputs = {}
+    for folder in ['val2017']:
+        print(folder)
+        for file in os.listdir(os.path.join(src, folder)):
+            # if file in outputs:
+            #     continue
+            image = Image.open(os.path.join(src, folder, file)).convert('RGB')
+            outputs[file] = capgen(image, return_eng=True)
+            df = pd.DataFrame({
+                'file': [file],
+                '0': [outputs[file][0]],
+                '1': [outputs[file][1]],
+                '2': [outputs[file][2]],
+                '3': [outputs[file][3]],
+                '4': [outputs[file][4]],
+            })
+            df.to_csv(f'outputs2.csv', mode='a', header=False, index=False)
     # json.dump(outputs,
     #           open('outputs2.json', 'w'))
