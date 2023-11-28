@@ -1,4 +1,4 @@
-from transformers import AutoModelForSeq2SeqLM, AutoTokenizer, AutoModelWithLMHead, AutoModelForCausalLM
+from transformers import AutoModelForSeq2SeqLM, AutoTokenizer, AutoModelWithLMHead, AutoModelForCausalLM, GPT2LMHeadModel
 from datagen import MTLDataset
 from transformers import Seq2SeqTrainer, Seq2SeqTrainingArguments
 import os
@@ -70,7 +70,7 @@ if __name__ == '__main__':
     output_dir = 'checkpoints/'
     rouge = evaluate.load('rouge')
 
-    model = AutoModelForCausalLM.from_pretrained('/home/palm/PycharmProjects/capocr/workdir/tinygpt_distilled_256_8_0.5_32_8_distil_prerained_mse/train/checkpoint-905000')
+    model = GPT2LMHeadModel.from_pretrained('/home/palm/PycharmProjects/capocr/workdir/tinygpt_distilled_256_8_0.5_32_8_distil_prerained_mse/train/checkpoint-905000')
     tokenizer = AutoTokenizer.from_pretrained('/home/palm/PycharmProjects/capocr/workdir/tinygpt_distilled_256_8_0.5_32_8_distil_prerained_mse/train/checkpoint-905000')
 
     train_set = MTLDataset('data/train.csv')
