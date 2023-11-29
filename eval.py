@@ -27,23 +27,24 @@ def compute_metrics(eval_preds):
 
 
 if __name__ == '__main__':
-    tokenizer = AutoTokenizer.from_pretrained("facebook/nllb-200-distilled-600M", src_lang="eng_Latn")
+    tokenizer = AutoTokenizer.from_pretrained("facebook/nllb-200-distilled-600M", src_lang="tha_Thai")
     rouge = evaluate.load("rouge")
-    bleu = evaluate.load("bleu")
+    meteor = evaluate.load("meteor")
     sacrebleu = evaluate.load("sacrebleu")
     origins = json.load(open('/media/palm/data/coco/annotations/caption_human_thai_val2017.json'))
-    df = pd.read_csv('outputs.csv')
     gt = {}
     for ann in origins['annotations']:
         if int(ann['image_id']) not in gt:
             gt[int(ann['image_id'])] = []
         text = ' '.join([tokenizer.decode(x) for x in tokenizer(ann['caption_thai'])['input_ids'][1:-1]])
         gt[int(ann['image_id'])].append(text)
+    pds = json.load(open('outputs2.json'))
     pd = {}
-    for idx, row in df.iterrows():
-        key = int(row[0][:-4])
+    for k in pds:
+        key = int(k[:-4])
         if key in gt:
-            text = ' '.join([tokenizer.decode(x) for x in tokenizer(row[1])['input_ids'][1:-1]])
+            cap = pds[k]
+            text = ' '.join([tokenizer.decode(x) for x in tokenizer(cap[0])['input_ids'][1:-1]])
             pd[key] = text
     labels = []
     preds = []
@@ -56,4 +57,14 @@ if __name__ == '__main__':
         preds.append(pd[key])
     results = sacrebleu.compute(predictions=preds,
                                 references=labels)
+    print('sacrebleu')
     print(results)
+    rouge_result = rouge.compute(predictions=preds,
+                                 references=labels,
+                                 use_stemmer=True)
+    print('rouge_result')
+    print(rouge_result)
+    meteor_result = meteor.compute(predictions=preds,
+                                   references=labels)
+    print('meteor')
+    print(meteor_result)
