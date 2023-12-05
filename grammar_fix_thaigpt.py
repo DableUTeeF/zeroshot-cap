@@ -4,6 +4,7 @@ from transformers import GenerationConfig, LlamaForCausalLM, LlamaTokenizer
 from peft import PeftModel
 import time
 import json
+import os
 
 
 def generate(input, instruction):
@@ -76,8 +77,20 @@ if __name__ == '__main__':
         top_k=top_k,
         num_beams=num_beams,
     )
-    val = json.load(open('/home/palm/data/coco/annotations/annotations/caption_human_thai_val2017.json'))
-    images = [int(x['image_id']) for x in val['annotations']]
+    
+    if os.path.exists('/home/palm/data/coco/annotations/'):
+        val = json.load(open('/home/palm/data/coco/annotations/caption_human_thai_val2017.json'))
+        length = 581
+    else:
+        val = json.load(open('/media/palm/data/coco/annotations/caption_human_thai_val2017.json'))
+        length = 3557
+    # images = [int(x['image_id']) for x in val['annotations']]
+    gt = {}
+    for ann in val['annotations']:
+        if int(ann['image_id']) not in gt:
+            gt[int(ann['image_id'])] = []
+        text = 1
+        gt[int(ann['image_id'])].append(text)
     # instruction = 'แก้ประโยคต่อไปนี้ให้มีไวยากรณ์ที่ถูกต้อง'
     # input = 'สองหมาอยู่กำลังวิ่งบนหนึ่งสนาม'
     df = pd.read_csv('outputs.csv', header=None)
@@ -85,7 +98,9 @@ if __name__ == '__main__':
     df['tled'] = ''
     df['time'] = 0
     for i, row in df.iterrows():
-        if int(row[0][:-4]) not in images:
+        if i < length:
+            continue
+        if int(row[0][:-4]) not in gt or len(gt[int(row[0][:-4])]) < 2:
             continue
         t = time.time()
         df['grammared'].iloc[i] = generate(row[1], 'แก้ประโยคต่อไปนี้ให้มีไวยากรณ์ที่ถูกต้อง').split('\n')[-1].replace('</s>', '')
