@@ -32,7 +32,7 @@ class ZeroShotThaiCapgen(nn.Module):
         # self.tr_model.eval().cuda()
         # self.clip_model.eval().cuda()
         # self.ppl_model.eval().cuda()
-        # print('cuda')
+        # print(device)
 
     def img2eng(
             self,
@@ -40,7 +40,7 @@ class ZeroShotThaiCapgen(nn.Module):
             gen_kwargs,
     ):
 
-        pixel_values = self.ic_processor(images=[pil_image], return_tensors="pt").pixel_values.to('cuda')
+        pixel_values = self.ic_processor(images=[pil_image], return_tensors="pt").pixel_values.to(device)
 
         output_ids = self.ic_model.generate(pixel_values, **gen_kwargs)
 
@@ -54,7 +54,7 @@ class ZeroShotThaiCapgen(nn.Module):
             captions,
             use_ppl=False,
     ):
-        inputs = self.clip_processor(images=pil_image, text=captions, padding=True, return_tensors="pt", max_length=77, truncation=True).to('cuda')
+        inputs = self.clip_processor(images=pil_image, text=captions, padding=True, return_tensors="pt", max_length=77, truncation=True).to(device)
 
         with torch.no_grad():
             image_features = self.clip_model.get_image_features(inputs['pixel_values'], output_hidden_states=True)
@@ -81,7 +81,7 @@ class ZeroShotThaiCapgen(nn.Module):
             eng_caption,
             gen_kwargs,
     ):
-        inputs = self.tr_tokenizer(eng_caption, return_tensors="pt").to('cuda')
+        inputs = self.tr_tokenizer(eng_caption, return_tensors="pt").to(device)
         translated_tokens = self.tr_model.generate(**inputs, forced_bos_token_id=self.tr_tokenizer.lang_code_to_id["tha_Thai"],  **gen_kwargs)
         tha_caption = self.tr_tokenizer.batch_decode(translated_tokens, skip_special_tokens=True)
 
@@ -130,10 +130,13 @@ class ZeroShotThaiCapgen(nn.Module):
             max_length=30,
             return_tensors="pt",
             return_attention_mask=True,
-        ).to('cuda')
+        ).to(device)
 
         encoded_texts = encodings["input_ids"]
         attn_masks = encodings["attention_mask"]
+        if encoded_texts.max() > 50256:
+            attn_masks[encoded_texts > 50256] = 0
+            encoded_texts[encoded_texts > 50256] = 0
 
         with torch.no_grad():
             out_logits = self.ppl_model(encoded_texts, attention_mask=attn_masks).logits
@@ -153,23 +156,25 @@ class ZeroShotThaiCapgen(nn.Module):
 
 
 if __name__ == '__main__':
-    capgen = ZeroShotThaiCapgen().eval().cuda()
-    print('cuda')
-    src = '/media/palm/data/coco/images'
+    device = 'cuda'
+    capgen = ZeroShotThaiCapgen().to(device).eval()
+    print(device)
+    src = '/home/palm/data/coco/images'
     # outputs = json.load(open('outputs.json'))
     # df = pd.read_csv('outputs.csv', header=None)
     # finished = list(outputs.keys()) + list(df[0])
     print('starting')
     outputs = {}
-    df = pd.read_csv('outputs2.csv', header=None)
+    # df = pd.read_csv('outputs2.csv', header=None)
+    ins = json.load(open('/mnt/c/Users/Admin/Downloads/work/capgen/zeroshot/out.json'))
     for folder in ['val2017']:
         print(folder)
-        for idx, row in df.iterrows():
+        for key in ins:
             # if file in outputs:
             #     continue
-            file = row[0]
+            file = key
             image = Image.open(os.path.join(src, folder, file)).convert('RGB')
-            outputs[file] = capgen(image, eng_captions=row.values[1:].tolist())
+            outputs[file] = capgen(image, eng_captions=ins[key][0])
             # df = pd.DataFrame({
             #     'file': [file],
             #     '0': [outputs[file][0]],
@@ -180,4 +185,4 @@ if __name__ == '__main__':
             # })
             # df.to_csv(f'outputs2.csv', mode='a', header=False, index=False)
     json.dump(outputs,
-              open('outputs2.json', 'w'))
+              open('outputs3.json', 'w'))

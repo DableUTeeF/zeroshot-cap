@@ -31,14 +31,14 @@ if __name__ == '__main__':
     rouge = evaluate.load("rouge")
     meteor = evaluate.load("meteor")
     sacrebleu = evaluate.load("sacrebleu")
-    origins = json.load(open('/media/palm/data/coco/annotations/caption_human_thai_val2017.json'))
+    origins = json.load(open('/home/palm/data/coco/annotations/annotations/caption_human_thai_val2017.json'))
     gt = {}
     for ann in origins['annotations']:
         if int(ann['image_id']) not in gt:
             gt[int(ann['image_id'])] = []
         text = ' '.join([tokenizer.decode(x) for x in tokenizer(ann['caption_thai'])['input_ids'][1:-1]])
         gt[int(ann['image_id'])].append(text)
-    pds = json.load(open('outputs2.json'))
+    pds = json.load(open('outputs3.json'))
     pd = {}
     for k in pds:
         key = int(k[:-4])
