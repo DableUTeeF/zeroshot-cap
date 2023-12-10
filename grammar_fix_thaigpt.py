@@ -79,7 +79,7 @@ if __name__ == '__main__':
     )
     
     if os.path.exists('/home/palm/data/coco/annotations/'):
-        val = json.load(open('/home/palm/data/coco/annotations/caption_human_thai_val2017.json'))
+        val = json.load(open('/home/palm/data/coco/annotations/annotations/caption_human_thai_val2017.json'))
         length = 581
     else:
         val = json.load(open('/media/palm/data/coco/annotations/caption_human_thai_val2017.json'))
